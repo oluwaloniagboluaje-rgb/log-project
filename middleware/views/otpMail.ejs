@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Verification</title>
+    <style>
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #2c3e50;
+            background-color: #ecf0f1;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .email-wrapper {
+            max-width: 500px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .email-header {
+            background-color: #3498db;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .email-body {
+            padding: 30px;
+        }
+        
+        .otp-box {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 25px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        
+        .otp-number {
+            font-size: 42px;
+            font-weight: 700;
+            color: #3498db;
+            letter-spacing: 5px;
+            margin: 10px 0;
+        }
+        
+        .warning {
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-top: 20px;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #f8f9fa;
+            font-size: 12px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-header">
+            <h2 style="margin:0;"><%=  'SecureApp' %></h2>
+        </div>
+        
+        <div class="email-body">
+            <p>Hi <%=  'User' %>,</p>
+            <p>You requested a one-time password (OTP) for verification:</p>
+            
+            <div class="otp-box">
+                <p style="margin-bottom:5px;">Your OTP is:</p>
+                <div class="otp-number"><%= otp %></div>
+                <p style="color:#7f8c8d; font-size:14px;">Valid for <%='5 minutes' %></p>
+            </div>
+            
+            <p>If you didn't request this, please ignore this email.</p>
+            
+            <div class="warning">
+                ⚠️ Never share this OTP with anyone. Our team will never ask for it.
+            </div>
+            
+            <p style="margin-top:20px;">Regards,<br><%='The Team' %></p>
+        </div>
+        
+        <div class="footer">
+            <p>&copy; <%= new Date().getFullYear() %> <%=  'Swift Route' %></p>
+        </div>
+    </div>
+</body>
+</html>

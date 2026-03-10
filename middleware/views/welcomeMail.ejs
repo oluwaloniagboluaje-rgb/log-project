@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="margin:0;padding:0;background:#0b1120;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#111827;border:1px solid rgba(201,168,76,.2);border-radius:16px;overflow:hidden;">
+
+    <!-- Header -->
+    <div style="background:linear-gradient(135deg,#c9a84c,#a07830);padding:32px;text-align:center;">
+      <div style="display:inline-flex;align-items:center;gap:10px;justify-content:center;">
+        <div style="width:44px;height:44px;background:rgba(11,17,32,.25);border-radius:12px;display:inline-block;text-align:center;line-height:44px;font-size:22px;">🚛</div>
+        <div style="text-align:left;">
+          <div style="font-size:22px;font-weight:800;color:#0b1120;letter-spacing:-.5px;">SwiftRoute</div>
+          <div style="font-size:10px;color:rgba(11,17,32,.6);letter-spacing:.12em;text-transform:uppercase;">UK Logistics</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div style="padding:36px 32px;">
+      <h1 style="font-size:22px;font-weight:800;color:#ffffff;margin:0 0 8px;">
+        Welcome aboard, <%= firstName %>! 👋
+      </h1>
+      <p style="font-size:14px;color:#9ca3af;margin:0 0 28px;line-height:1.7;">
+        Your account is ready. Here's what you can do with SwiftRoute:
+      </p>
+
+      <!-- Features -->
+      <div style="margin-bottom:32px;">
+        <div style="display:flex;align-items:flex-start;gap:14px;background:#0b1120;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+          <span style="font-size:20px;">📦</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;">Place Orders</div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.5;">Book deliveries across the UK with real-time tracking.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;background:#0b1120;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+          <span style="font-size:20px;">📍</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;">Track Live</div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.5;">Follow your parcel every step of the way.</div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:flex-start;gap:14px;background:#0b1120;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:14px 16px;">
+          <span style="font-size:20px;">🕑</span>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:#fff;margin-bottom:2px;">Delivery History</div>
+            <div style="font-size:12px;color:#6b7280;line-height:1.5;">View all your past and active orders in one place.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align:center;">
+        <a href="https://swiftroute.co.uk/dashboard"
+           style="display:inline-block;background:linear-gradient(135deg,#c9a84c,#a07830);color:#0b1120;font-weight:700;font-size:14px;padding:14px 32px;border-radius:10px;text-decoration:none;">
+          Go to Dashboard →
+        </a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding:18px 32px;border-top:1px solid rgba(255,255,255,.06);text-align:center;">
+      <p style="font-size:11px;color:#4b5563;margin:0;line-height:1.6;">
+        © <%= new Date().getFullYear() %> Swift Route Ltd · Registered in England & Wales<br>
+        You're receiving this because you created a SwiftRoute account.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

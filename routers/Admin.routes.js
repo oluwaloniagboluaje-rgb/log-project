@@ -6,6 +6,7 @@ const User = require('../models/User.model');
 const Notification = require('../models/Notification.model');
 const { protect, requireRole } = require('../utility/Auth');
 const { emitToUser, emitToDriver, emitToAdmins } = require('../Socket/SocketHandler');
+const { getRevenue } = require('../controllers/Admin.controller');
 
 // Get all orders
 router.get('/orders', protect, requireRole('admin'), async (req, res) => {
@@ -244,5 +245,8 @@ router.patch('/notifications/read-all', protect, requireRole('admin'), async (re
     res.status(500).json({ message: err.message });
   }
 });
+
+router.get('/revenue', protect, requireRole('admin'), getRevenue);
+
 
 module.exports = router;

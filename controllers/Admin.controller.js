@@ -435,6 +435,110 @@ const markAllRead = async (req, res) => {
   }
 };
 
+
+const getRevenue = async (req, res) => {
+  try {
+    const { page = 1, limit = 20, from, to, driverId, search } = req.query;
+
+    // ── Base query: delivered orders only ──
+    const query = { status: 'delivered' };
+
+    if (from || to) {
+      query.actualDelivery = {};
+      if (from) query.actualDelivery.$gte = new Date(from);
+      if (to)   query.actualDelivery.$lte = new Date(new Date(to).setHours(23, 59, 59, 999));
+    }
+    if (driverId) query.driver = driverId;
+    if (search)   query.orderNumber = { $regex: search, $options: 'i' };
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const [orders, total, summaryAgg, byDriverAgg, byMonthAgg] = await Promise.all([
+
+      // Paginated transaction list
+      Order.find(query)
+        .populate('user',   'name email phone avatar')
+        .populate('driver', 'name phone vehicleType vehiclePlate avatar')
+        .sort({ actualDelivery: -1 })
+        .limit(parseInt(limit))
+        .skip(skip),
+
+      // Total count (for pagination)
+      Order.countDocuments(query),
+
+      // Revenue summary (total / vat / subtotal) for the current filter
+      Order.aggregate([
+        { $match: query },
+        {
+          $group: {
+            _id: null,
+            total:    { $sum: '$pricing.total'    },
+            vat:      { $sum: '$pricing.vat'      },
+            subtotal: { $sum: '$pricing.subtotal' },
+          }
+        }
+      ]),
+
+      // Top 10 drivers by revenue (all-time, ignores date/search filters)
+      Order.aggregate([
+        { $match: { status: 'delivered', driver: { $ne: null } } },
+        {
+          $group: {
+            _id:   '$driver',
+            total: { $sum: '$pricing.total' },
+            count: { $sum: 1 },
+          }
+        },
+        { $sort: { total: -1 } },
+        { $limit: 10 },
+        {
+          $lookup: {
+            from: 'drivers', localField: '_id', foreignField: '_id', as: 'driver'
+          }
+        },
+        { $unwind: '$driver' },
+        {
+          $project: {
+            total: 1, count: 1,
+            'driver.name': 1, 'driver.avatar': 1, 'driver.vehicleType': 1
+          }
+        }
+      ]),
+
+      // Monthly revenue — last 6 months (all-time, ignores filters)
+      Order.aggregate([
+        {
+          $match: {
+            status: 'delivered',
+            actualDelivery: { $gte: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000) }
+          }
+        },
+        {
+          $group: {
+            _id:   { year: { $year: '$actualDelivery' }, month: { $month: '$actualDelivery' } },
+            total: { $sum: '$pricing.total' },
+            count: { $sum: 1 },
+          }
+        },
+        { $sort: { '_id.year': 1, '_id.month': 1 } }
+      ])
+    ]);
+
+    res.json({
+      orders,
+      total,
+      page:     parseInt(page),
+      pages:    Math.ceil(total / parseInt(limit)),
+      summary:  summaryAgg[0] || { total: 0, vat: 0, subtotal: 0 },
+      byDriver: byDriverAgg,
+      byMonth:  byMonthAgg,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
 module.exports = {
   getDashboardStats,
   getAllOrders,
@@ -447,5 +551,6 @@ module.exports = {
   getAllUsers,
   getAdminNotifications,
   markNotificationRead,
-  markAllRead
+  markAllRead,
+  getRevenue
 };

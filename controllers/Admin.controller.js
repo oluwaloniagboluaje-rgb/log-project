@@ -5,10 +5,10 @@ const Notification = require('../models/Notification.model');
 
 // Safe socket emitters — do nothing if req.io is unavailable (Vercel)
 const emitToDriver = (io, driverId, event, data) => {
-  try { if (io) io.to(`driver_${driverId}`).emit(event, data); } catch {}
+  try { if (io) io.to(`driver_${driverId}`).emit(event, data); } catch { }
 };
 const emitToUser = (io, userId, event, data) => {
-  try { if (io) io.to(`user_${userId}`).emit(event, data); } catch {}
+  try { if (io) io.to(`user_${userId}`).emit(event, data); } catch { }
 };
 
 const getDashboardStats = async (req, res) => {
@@ -91,7 +91,7 @@ const assignDriver = async (req, res) => {
       Driver.findById(driverId)
     ]);
 
-    if (!order)  return res.status(404).json({ message: 'Order not found' });
+    if (!order) return res.status(404).json({ message: 'Order not found' });
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
 
     if (['delivered', 'cancelled'].includes(order.status)) {
@@ -287,10 +287,10 @@ const getRevenue = async (req, res) => {
     if (from || to) {
       query.actualDelivery = {};
       if (from) query.actualDelivery.$gte = new Date(from);
-      if (to)   query.actualDelivery.$lte = new Date(new Date(to).setHours(23, 59, 59, 999));
+      if (to) query.actualDelivery.$lte = new Date(new Date(to).setHours(23, 59, 59, 999));
     }
     if (driverId) query.driver = driverId;
-    if (search)   query.orderNumber = { $regex: search, $options: 'i' };
+    if (search) query.orderNumber = { $regex: search, $options: 'i' };
 
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -330,7 +330,17 @@ const getRevenue = async (req, res) => {
 };
 
 module.exports = {
-  getDashboardStats, getAllOrders, getOrderById, assignDriver, markDelivered,
-  getAllDrivers, deactivateDriver, activateDriver, getAllUsers,
-  getAdminNotifications, markNotificationRead, markAllRead, getRevenue
+  getDashboardStats,
+  getAllOrders,
+  getOrderById,
+  assignDriver,
+  markDelivered,
+  getAllDrivers,
+  deactivateDriver,
+  activateDriver,
+  getAllUsers,
+  getAdminNotifications,
+  markNotificationRead,
+  markAllRead,
+  getRevenue
 };

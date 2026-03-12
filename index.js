@@ -32,7 +32,7 @@ app.use(cors({
 }));
 
 // Handle preflight requests
-app.options('*', cors());
+app.options('/{*path}', cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

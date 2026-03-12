@@ -17,10 +17,27 @@ const allowedOrigins = [
   process.env.CLIENT_URL,
 ].filter(Boolean);
 
-app.use(cors({ origin: allowedOrigins, credentials: true }));
+// ── CORS ─────────────────────────────────────────────────────────
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+}));
+
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ── CACHED DB CONNECTION ─────────────────────────────────────────
 let isConnected = false;
 const connectDB = async () => {
   if (isConnected) return;
@@ -34,6 +51,7 @@ app.use(async (req, res, next) => {
   catch (err) { res.status(500).json({ message: 'Database connection failed' }); }
 });
 
+// ── ROUTES ───────────────────────────────────────────────────────
 app.use('/api/auth',    authRoutes);
 app.use('/api/orders',  orderRoutes);
 app.use('/api/drivers', driverRoutes);
@@ -43,10 +61,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Server is running' });
 });
 
+// ── 404 ──────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({ message: `Route ${req.originalUrl} not found` });
 });
 
+// ── GLOBAL ERROR HANDLER ─────────────────────────────────────────
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
   res.status(err.status || 500).json({ message: err.message || 'Internal server error' });

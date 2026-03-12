@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
-const { v4: uuidv4 } = require('uuid');
+const { randomBytes } = require('crypto');
+
+const uuidv4 = () => randomBytes(16).toString('hex');
 
 const TrackingEventSchema = new mongoose.Schema({
   status: { type: String, required: true },
@@ -56,8 +58,8 @@ const OrderSchema = new mongoose.Schema({
     },
     images: [
       {
-        url: { type: String, required: true },   // Cloudinary secure URL
-        publicId: { type: String, required: true }    // Cloudinary public_id for management
+        url: { type: String, required: true },
+        publicId: { type: String, required: true }
       }
     ]
   },
@@ -105,6 +107,5 @@ const OrderSchema = new mongoose.Schema({
 OrderSchema.index({ user: 1 });
 OrderSchema.index({ driver: 1 });
 OrderSchema.index({ status: 1 });
-// OrderSchema.index({ orderNumber: 1 });
 
 module.exports = mongoose.model('Order', OrderSchema);

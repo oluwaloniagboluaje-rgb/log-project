@@ -3,8 +3,18 @@ const User = require('../models/User.model');
 const Driver = require('../models/Driver.model');
 const Notification = require('../models/Notification.model');
 const { calculatePrice } = require('../utility/Pricing');
-const { emitToAdmins, emitToUser, emitToDriver } = require('../Socket/SocketHandler');
 const { mailSender, sendMail } = require('../middleware/mailer');
+
+// Safe socket emitters — silent on Vercel where req.io is undefined
+const emitToAdmins = (io, event, data) => {
+  try { if (io) io.to('admins').emit(event, data); } catch {}
+};
+const emitToUser = (io, userId, event, data) => {
+  try { if (io) io.to(`user_${userId}`).emit(event, data); } catch {}
+};
+const emitToDriver = (io, driverId, event, data) => {
+  try { if (io) io.to(`driver_${driverId}`).emit(event, data); } catch {}
+};
 
 const statusMessages = {
   picked_up: 'Package has been picked up by the driver.',
@@ -33,7 +43,6 @@ const calculateOrderPrice = async (req, res) => {
     const pricing = calculatePrice({ weightKg: parseFloat(weightKg), pickupPostcode, deliveryPostcode, fragile: !!fragile });
     res.json(pricing);
   } catch (err) {
-    console.error('calculateOrderPrice error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -54,7 +63,7 @@ const placeOrder = async (req, res) => {
     let pricing;
     try {
       pricing = calculatePrice({ weightKg: parseFloat(pkg.weightKg), pickupPostcode: pickup.postcode, deliveryPostcode: delivery.postcode, fragile: !!pkg.fragile });
-    } catch (pricingErr) {
+    } catch {
       const w = parseFloat(pkg.weightKg);
       const subtotal = parseFloat((8.99 + w * 1.5 + (pkg.fragile ? 2.5 : 0)).toFixed(2));
       const vat = parseFloat((subtotal * 0.2).toFixed(2));
@@ -73,27 +82,20 @@ const placeOrder = async (req, res) => {
     });
     await order.populate('user', 'name email phone');
 
-    // Email notification to user — order placed
     mailSender('orderPlacedMail.ejs', {
-      firstName: req.user.name,
-      orderNumber: order.orderNumber,
+      firstName: req.user.name, orderNumber: order.orderNumber,
       pickup: `${pickup.address}, ${pickup.city}, ${pickup.postcode}`,
       delivery: `${delivery.address}, ${delivery.city}, ${delivery.postcode}`,
-      description: pkg.description,
-      weightKg: pkg.weightKg,
-      total: pricing.total,
-    })
-      .then(html => sendMail(req.user.email, `Order Confirmed — ${order.orderNumber}`, html))
+      description: pkg.description, weightKg: pkg.weightKg, total: pricing.total,
+    }).then(html => sendMail(req.user.email, `Order Confirmed — ${order.orderNumber}`, html))
       .catch(err => console.error('orderPlaced mail failed:', err.message));
 
     notifyAdmins('New Order Placed 📦', `${req.user.name} placed order ${order.orderNumber} — ${pickup.city} → ${delivery.city}`, 'order_placed', order._id, order.orderNumber);
-    if (req.io) {
-      try { emitToAdmins(req.io, 'new_order', { orderId: order._id, orderNumber: order.orderNumber, userName: req.user.name, order }); }
-      catch (e) { console.error('Socket emit error:', e.message); }
-    }
+    emitToAdmins(req.io, 'new_order', { orderId: order._id, orderNumber: order.orderNumber, userName: req.user.name, order });
+
     res.status(201).json(order);
   } catch (err) {
-    console.error('placeOrder error:', err.message, err.stack);
+    console.error('placeOrder error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -110,7 +112,6 @@ const getMyOrders = async (req, res) => {
     ]);
     res.json({ orders, total, page: parseInt(page), pages: Math.ceil(total / parseInt(limit)) });
   } catch (err) {
-    console.error('getMyOrders error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -128,7 +129,6 @@ const getOrder = async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     res.json(order);
   } catch (err) {
-    console.error('getOrder error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -144,11 +144,10 @@ const cancelOrder = async (req, res) => {
     order.cancelReason = req.body.reason || 'Cancelled by user';
     order.trackingHistory.push({ status: 'cancelled', message: `Order cancelled. Reason: ${order.cancelReason}`, updatedBy: { role: 'user', id: req.user._id, name: req.user.name } });
     await order.save();
-    if (req.io) { try { emitToAdmins(req.io, 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status: 'cancelled' }); } catch (e) { } }
+    emitToAdmins(req.io, 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status: 'cancelled' });
     notifyAdmins('Order Cancelled ❌', `${req.user.name} cancelled order ${order.orderNumber}.`, 'order_cancelled', order._id, order.orderNumber);
     res.json(order);
   } catch (err) {
-    console.error('cancelOrder error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -159,7 +158,6 @@ const getDriverAssigned = async (req, res) => {
     const orders = await Order.find({ driver: req.user._id, status: { $nin: ['delivered', 'cancelled'] } }).populate('user', 'name email phone').sort({ createdAt: -1 });
     res.json(orders);
   } catch (err) {
-    console.error('getDriverAssigned error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -175,7 +173,6 @@ const getDriverHistory = async (req, res) => {
     ]);
     res.json({ orders, total, totalDelivered, page: parseInt(page) });
   } catch (err) {
-    console.error('getDriverHistory error:', err.message);
     res.status(500).json({ message: err.message });
   }
 };
@@ -197,12 +194,8 @@ const driverUpdateStatus = async (req, res) => {
     order.trackingHistory.push({ status, message: statusMessages[status], locationName: locationName || null, updatedBy: { role: 'driver', id: req.user._id, name: req.user.name } });
     await order.save();
     await order.populate('user', 'name email phone');
-    if (req.io) {
-      try {
-        req.io.to(`user_${order.user._id}`).emit('order_update', { orderId: order._id, orderNumber: order.orderNumber, status, message: statusMessages[status] });
-        emitToAdmins(req.io, 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status, driverName: req.user.name });
-      } catch (e) { console.error('Socket error:', e.message); }
-    }
+    emitToUser(req.io, order.user._id.toString(), 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status, message: statusMessages[status] });
+    emitToAdmins(req.io, 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status, driverName: req.user.name });
     Notification.create({ recipient: order.user._id, recipientModel: 'User', recipientRole: 'user', title: `Order ${status.replace(/_/g, ' ')}`, message: statusMessages[status], type: `order_${status}`, orderId: order._id, orderNumber: order.orderNumber }).catch(console.error);
     res.json(order);
   } catch (err) {
@@ -211,15 +204,13 @@ const driverUpdateStatus = async (req, res) => {
   }
 };
 
-// @route PATCH /api/orders/:id/assign-driver  (admin only)
+// @route PATCH /api/orders/:id/assign-driver (admin only)
 const assignDriver = async (req, res) => {
   try {
     const { driverId } = req.body;
     if (!driverId) return res.status(400).json({ message: 'driverId is required' });
-
     const order = await Order.findById(req.params.id).populate('user', 'name email phone');
     if (!order) return res.status(404).json({ message: 'Order not found' });
-
     const driver = await Driver.findById(driverId);
     if (!driver) return res.status(404).json({ message: 'Driver not found' });
 
@@ -229,31 +220,19 @@ const assignDriver = async (req, res) => {
     await order.save();
     await order.populate('driver', 'name phone vehicleType vehiclePlate vehicleModel rating avatar');
 
-    // Email user — driver assigned
     if (order.user?.email) {
       mailSender('driverAssignedMail.ejs', {
-        firstName: order.user.name,
-        orderNumber: order.orderNumber,
-        driverName: driver.name,
-        driverPhone: driver.phone,
-        vehicleType: driver.vehicleType,
-        vehiclePlate: driver.vehiclePlate,
-        vehicleModel: driver.vehicleModel || '',
-        driverAvatar: driver.avatar || null,
-      })
-        .then(html => sendMail(order.user.email, `Driver Assigned — ${order.orderNumber}`, html))
+        firstName: order.user.name, orderNumber: order.orderNumber,
+        driverName: driver.name, driverPhone: driver.phone,
+        vehicleType: driver.vehicleType, vehiclePlate: driver.vehiclePlate,
+        vehicleModel: driver.vehicleModel || '', driverAvatar: driver.avatar || null,
+      }).then(html => sendMail(order.user.email, `Driver Assigned — ${order.orderNumber}`, html))
         .catch(err => console.error('driverAssigned mail failed:', err.message));
     }
 
-    // Notify driver
     Notification.create({ recipient: driverId, recipientModel: 'Driver', recipientRole: 'driver', title: 'New Delivery Assigned 🚛', message: `You have been assigned order ${order.orderNumber} — ${order.pickup.city} → ${order.delivery.city}`, type: 'order_assigned', orderId: order._id, orderNumber: order.orderNumber }).catch(console.error);
-
-    if (req.io) {
-      try {
-        emitToDriver(req.io, driverId.toString(), 'order_assigned', { orderId: order._id, orderNumber: order.orderNumber });
-        emitToUser(req.io, order.user._id.toString(), 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status: 'assigned' });
-      } catch (e) { console.error('Socket error:', e.message); }
-    }
+    emitToDriver(req.io, driverId.toString(), 'order_assigned', { orderId: order._id, orderNumber: order.orderNumber });
+    emitToUser(req.io, order.user._id.toString(), 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status: 'assigned' });
 
     res.json(order);
   } catch (err) {
@@ -275,13 +254,11 @@ const confirmDelivery = async (req, res) => {
     await order.save();
     if (order.driver) Driver.findByIdAndUpdate(order.driver._id, { $inc: { totalDeliveries: 1 }, isAvailable: true }).catch(console.error);
     notifyAdmins('✅ Delivery Confirmed', `${req.user.name} confirmed delivery of order ${order.orderNumber}`, 'order_delivered', order._id, order.orderNumber);
-    if (req.io) {
-      try {
-        emitToAdmins(req.io, 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status: 'delivered' });
-        if (order.driver) emitToDriver(req.io, order.driver._id.toString(), 'order_delivered', { orderId: order._id, orderNumber: order.orderNumber });
-      } catch (e) { console.error('Socket error:', e.message); }
+    emitToAdmins(req.io, 'order_update', { orderId: order._id, orderNumber: order.orderNumber, status: 'delivered' });
+    if (order.driver) {
+      emitToDriver(req.io, order.driver._id.toString(), 'order_delivered', { orderId: order._id, orderNumber: order.orderNumber });
+      Notification.create({ recipient: order.driver._id, recipientModel: 'Driver', recipientRole: 'driver', title: '✅ Delivery Confirmed', message: `${req.user.name} confirmed delivery of order ${order.orderNumber}. Great job!`, type: 'order_delivered', orderId: order._id, orderNumber: order.orderNumber }).catch(console.error);
     }
-    if (order.driver) Notification.create({ recipient: order.driver._id, recipientModel: 'Driver', recipientRole: 'driver', title: '✅ Delivery Confirmed', message: `${req.user.name} confirmed delivery of order ${order.orderNumber}. Great job!`, type: 'order_delivered', orderId: order._id, orderNumber: order.orderNumber }).catch(console.error);
     res.json(order);
   } catch (err) {
     console.error('confirmDelivery error:', err.message);
@@ -315,4 +292,8 @@ const markAllNotificationsRead = async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 
-module.exports = { calculateOrderPrice, placeOrder, getMyOrders, getOrder, cancelOrder, getDriverAssigned, getDriverHistory, driverUpdateStatus, assignDriver, confirmDelivery, getMyNotifications, markNotificationRead, markAllNotificationsRead };
+module.exports = {
+  calculateOrderPrice, placeOrder, getMyOrders, getOrder, cancelOrder,
+  getDriverAssigned, getDriverHistory, driverUpdateStatus, assignDriver,
+  confirmDelivery, getMyNotifications, markNotificationRead, markAllNotificationsRead
+};
